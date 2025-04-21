@@ -30,6 +30,7 @@ describe("sendFriendRequest", function () {
     );
 
     expect(friendRequest).toEqual({
+      id: friendRequest.id,
       senderId: testUserIds[0],
       recipientId: testUserIds[1],
       status: "pending",
@@ -56,8 +57,11 @@ describe("sendFriendRequest", function () {
   });
 
   test("fails: cannot send request if already friends", async function () {
-    await Friend.sendFriendRequest(testUserIds[0], testUserIds[1]);
-    await Friend.acceptFriendRequest(testUserIds[0], testUserIds[1]);
+    const request = await Friend.sendFriendRequest(
+      testUserIds[0],
+      testUserIds[1]
+    );
+    await Friend.acceptFriendRequest(request.id, testUserIds[1]);
 
     await expect(
       Friend.sendFriendRequest(testUserIds[0], testUserIds[1])
@@ -82,30 +86,46 @@ describe("sendFriendRequest", function () {
 
 describe("acceptFriendRequest", function () {
   test("works: recipient can accept a friend request", async function () {
-    await Friend.sendFriendRequest(testUserIds[0], testUserIds[1]);
-
-    const result = await Friend.acceptFriendRequest(
+    const request = await Friend.sendFriendRequest(
       testUserIds[0],
       testUserIds[1]
     );
+    const result = await Friend.acceptFriendRequest(request.id, testUserIds[1]);
 
     expect(result).toEqual({
+      id: request.id,
       senderId: testUserIds[0],
       recipientId: testUserIds[1],
       status: "accepted",
     });
 
-    const dbCheck = await db.query(
-      `SELECT status FROM friend WHERE sender_id = $1 AND recipient_id = $2`,
-      [testUserIds[0], testUserIds[1]]
-    );
+    const dbCheck = await db.query(`SELECT status FROM friend WHERE id = $1`, [
+      request.id,
+    ]);
     expect(dbCheck.rows[0].status).toEqual("accepted");
   });
 
-  test("fails: cannot accept a request that doesn't exist", async function () {
+  test("fails: cannot accept a non-pending request", async () => {
+    const request = await Friend.sendFriendRequest(
+      testUserIds[0],
+      testUserIds[1]
+    );
+    const result = await Friend.acceptFriendRequest(request.id, testUserIds[1]);
+
     await expect(
-      Friend.acceptFriendRequest(testUserIds[0], testUserIds[2])
-    ).rejects.toThrow(NotFoundError);
+      Friend.acceptFriendRequest(result.id, testUserIds[1])
+    ).rejects.toThrow(BadRequestError);
+  });
+
+  test("fails: user is not the recipient", async () => {
+    const request = await Friend.sendFriendRequest(
+      testUserIds[0],
+      testUserIds[1]
+    );
+
+    await expect(
+      Friend.acceptFriendRequest(request.id, testUserIds[0])
+    ).rejects.toThrow(BadRequestError);
   });
 });
 
@@ -113,109 +133,117 @@ describe("acceptFriendRequest", function () {
 
 describe("remove", function () {
   test("works: remove friend request", async function () {
-    await Friend.sendFriendRequest(testUserIds[0], testUserIds[1]);
-    const result = await Friend.remove(testUserIds[0], testUserIds[1]);
+    const request = await Friend.sendFriendRequest(
+      testUserIds[0],
+      testUserIds[1]
+    );
+    const result = await Friend.remove(request.id);
     expect(result).toEqual({ removed: true });
 
     // Verify it was actually removed
-    const res = await db.query(
-      `SELECT * FROM friend WHERE sender_id = $1 AND recipient_id = $2`,
-      [testUserIds[0], testUserIds[1]]
-    );
+    const res = await db.query(`SELECT * FROM friend WHERE id = $1`, [
+      request.id,
+    ]);
     expect(res.rows.length).toEqual(0);
   });
 
-  test("fails: no relationship exists", async function () {
-    await expect(Friend.remove(testUserIds[0], testUserIds[2])).rejects.toThrow(
-      NotFoundError
-    );
+  test("fails: friend id exists", async function () {
+    await expect(Friend.remove(486475)).rejects.toThrow(NotFoundError);
   });
 });
 
-/************************************** getFriendsByStatus */
+/************************************** getFriendsByUserId */
 
-describe("getFriendsByStatus", function () {
-  test("works: get accepted friends", async function () {
-    await Friend.sendFriendRequest(testUserIds[0], testUserIds[1]);
-    await Friend.acceptFriendRequest(testUserIds[0], testUserIds[1]);
+describe("getFriendsByUserId", function () {
+  test("works: returns accepted friend in 'friends'", async function () {
+    const request = await Friend.sendFriendRequest(
+      testUserIds[0],
+      testUserIds[1]
+    );
+    await Friend.acceptFriendRequest(request.id, testUserIds[1]);
 
-    const friends = await Friend.getFriendsByStatus(testUserIds[0], "accepted");
+    const { friends, incomingRequests, sentRequests } =
+      await Friend.getFriendsByUserId(testUserIds[0]);
 
     expect(friends).toEqual([
-      {
-        friendUsername: "u2",
+      expect.objectContaining({
+        username: "u2",
         firstName: "U2F",
         lastName: "U2L",
         email: "u2@email.com",
         profilePic: null,
-        status: "accepted",
-      },
+      }),
     ]);
+    expect(incomingRequests).toEqual([]);
+    expect(sentRequests).toEqual([]);
   });
 
-  test("works: get pending (sent) requests", async function () {
+  test("works: returns sent requests", async function () {
     await Friend.sendFriendRequest(testUserIds[0], testUserIds[1]);
     await Friend.sendFriendRequest(testUserIds[0], testUserIds[2]);
 
-    const pendingRequests = await Friend.getFriendsByStatus(
-      testUserIds[0],
-      "sent"
-    );
+    const { friends, incomingRequests, sentRequests } =
+      await Friend.getFriendsByUserId(testUserIds[0]);
 
-    expect(pendingRequests).toEqual([
+    expect(sentRequests).toEqual([
       {
-        friendUsername: "u2",
+        id: expect.any(Number),
+        username: "u2",
         firstName: "U2F",
         lastName: "U2L",
         email: "u2@email.com",
         profilePic: null,
-        status: "pending",
       },
       {
-        friendUsername: "admin",
+        id: expect.any(Number),
+        username: "admin",
         firstName: "Admin",
         lastName: "User",
         email: "admin@email.com",
         profilePic: null,
-        status: "pending",
       },
     ]);
+    expect(friends).toEqual([]);
+    expect(incomingRequests).toEqual([]);
   });
-  test("works: get pending requests", async function () {
+
+  test("works: returns incoming requests", async function () {
     await Friend.sendFriendRequest(testUserIds[2], testUserIds[1]);
 
-    const pendingRequests = await Friend.getFriendsByStatus(
-      testUserIds[1],
-      "pending"
-    );
+    const { friends, incomingRequests, sentRequests } =
+      await Friend.getFriendsByUserId(testUserIds[1]);
 
-    expect(pendingRequests).toEqual([
+    expect(incomingRequests).toEqual([
       {
-        friendUsername: "admin",
+        id: expect.any(Number),
+        username: "admin",
         firstName: "Admin",
         lastName: "User",
         email: "admin@email.com",
         profilePic: null,
-        status: "pending",
       },
     ]);
-  });
-  test("returns empty array if no friends found", async function () {
-    const friends = await Friend.getFriendsByStatus(testUserIds[0], "accepted");
     expect(friends).toEqual([]);
+    expect(sentRequests).toEqual([]);
   });
 
-  test("fails: invalid status", async function () {
-    await expect(
-      Friend.getFriendsByStatus(testUserIds[0], "blocked")
-    ).rejects.toThrow(BadRequestError);
+  test("returns empty arrays when user has no friends or requests", async function () {
+    const { friends, incomingRequests, sentRequests } =
+      await Friend.getFriendsByUserId(testUserIds[0]);
+
+    expect(friends).toEqual([]);
+    expect(incomingRequests).toEqual([]);
+    expect(sentRequests).toEqual([]);
   });
 });
 
 describe("areFriends", () => {
   test("works: true if friends", async () => {
-    await Friend.sendFriendRequest(testUserIds[0], testUserIds[1]);
-    await Friend.acceptFriendRequest(testUserIds[0], testUserIds[1]);
+    const request = await Friend.sendFriendRequest(
+      testUserIds[0],
+      testUserIds[1]
+    );
+    await Friend.acceptFriendRequest(request.id, testUserIds[1]);
     const result = await Friend.areFriends(testUserIds[0], testUserIds[1]);
     expect(result).toBe(true);
   });
@@ -235,5 +263,32 @@ describe("areFriends", () => {
   test("returns false if the users do not exist", async () => {
     const result = await Friend.areFriends(testUserIds[1], 3454);
     expect(result).toBe(false);
+  });
+});
+
+describe("getById()", function () {
+  let friendReq;
+
+  beforeAll(async function () {
+    friendReq = await Friend.sendFriendRequest(
+      testUserIds[0],
+      testUserIds[1]
+    );
+  });
+
+  test("works: retrieves friend request by ID", async function () {
+    const result = await Friend.getById(friendReq.id);
+
+    expect(result).toEqual({
+      id: friendReq.id,
+      senderId: testUserIds[0],
+      recipientId: testUserIds[1],
+      status: "pending",
+    });
+  });
+
+  test("returns null if no record found", async function () {
+    const result = await Friend.getById(46546); 
+    expect(result).toBeNull();
   });
 });

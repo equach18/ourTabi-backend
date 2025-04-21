@@ -6,7 +6,6 @@ CREATE DATABASE ourtabi;
 \connect ourtabi
 
 \i ourtabi-schema.sql
--- \i ourtabi-seed.sql 
 
 \echo 'Delete and recreate ourtabi_test db?'
 \prompt 'Return for yes or control-C to cancel > ' foo

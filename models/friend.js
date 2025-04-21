@@ -12,7 +12,7 @@ const {
 class Friend {
   /** Send a friend request
    *
-   * Returns { senderId, recipientId, status: "pending" }
+   * Returns { id, senderId, recipientId, status: "pending" }
    *
    * Throws BadRequestError if the friend request already exists or ids are the same.
    **/
@@ -23,7 +23,7 @@ class Friend {
     }
 
     const duplicateCheck = await db.query(
-      `SELECT * FROM friend 
+      `SELECT id FROM friend 
          WHERE (sender_id = $1 AND recipient_id = $2)
             OR (sender_id = $2 AND recipient_id = $1)`,
       [senderId, recipientId]
@@ -35,10 +35,20 @@ class Friend {
       );
     }
 
+    const recipientCheck = await db.query(
+      `SELECT id FROM users WHERE id = $1`,
+      [recipientId]
+    );
+    if (!recipientCheck.rows.length) {
+      throw new NotFoundError(
+        `Recipient with id ${recipientId} does not exist.`
+      );
+    }
+
     const result = await db.query(
       `INSERT INTO friend (sender_id, recipient_id, status)
          VALUES ($1, $2, 'pending')
-         RETURNING sender_id AS "senderId", recipient_id AS "recipientId", status`,
+         RETURNING id, sender_id AS "senderId", recipient_id AS "recipientId", status`,
       [senderId, recipientId]
     );
 
@@ -47,144 +57,129 @@ class Friend {
 
   /** Accept a friend request
    *
-   * Returns { senderId, recipientId, status: "accepted" }
+   * Returns { id, senderId, recipientId, status: "accepted" }
    *
-   * Throws NotFoundError if the request does not exist
+   * Throws NotFoundError if the friendship id does not exist
    **/
 
-  static async acceptFriendRequest(senderId, recipientId) {
-    const checkRequest = await db.query(
-      `SELECT sender_id, recipient_id, status FROM friend
-       WHERE ((sender_id = $1 AND recipient_id = $2) 
-          OR (sender_id = $2 AND recipient_id = $1)) 
-         AND status = 'pending'`,
-      [senderId, recipientId]
+  static async acceptFriendRequest(friendshipId, currentUserId) {
+    const checkRes = await db.query(
+      `SELECT id, sender_id, recipient_id, status
+       FROM friend
+       WHERE id = $1`,
+      [friendshipId]
     );
 
-    if (!checkRequest.rows.length) {
-      throw new NotFoundError(
-        `No pending friend request between users: ${senderId} and ${recipientId}.`
-      );
+    const request = checkRes.rows[0];
+
+    // Make sure that the status is pending
+    if (request.status !== "pending") {
+      throw new BadRequestError("Friend request is not pending.");
     }
 
-    const request = checkRequest.rows[0];
-    // Ensure only the recipient can accept
-    if (Number(recipientId) !== Number(request.recipient_id)) {
+    // Only recipient can accept
+    if (Number(currentUserId) !== Number(request.recipient_id)) {
       throw new BadRequestError(
-        "Only the recipient can accept the friend request."
+        "Only the recipient can accept this friend request."
       );
     }
 
-    // Accept the request
     const result = await db.query(
       `UPDATE friend
-       SET status = 'accepted'
-       WHERE sender_id = $1 AND recipient_id = $2
-       RETURNING sender_id AS "senderId", recipient_id AS "recipientId", status`,
-      [request.sender_id, request.recipient_id] 
+     SET status = 'accepted'
+     WHERE id = $1
+     RETURNING id, sender_id AS "senderId", recipient_id AS "recipientId", status`,
+      [friendshipId]
     );
 
     return result.rows[0];
   }
+  
   /** Deny friend request or remove friend
    *
    * Returns { removed: true }
    *
-   * Throws NotFoundError if record between users do not exist
+   * Throws NotFoundError if friendship id does not exist
    **/
 
-  static async remove(senderId, recipientId) {
+  static async remove(friendshipId) {
     const result = await db.query(
       `DELETE FROM friend
-         WHERE (sender_id = $1 AND recipient_id = $2)
-            OR (sender_id = $2 AND recipient_id = $1)
-         RETURNING sender_id`,
-      [senderId, recipientId]
+       WHERE id = $1
+       RETURNING id`,
+      [friendshipId]
     );
 
     if (!result.rows.length) {
-      throw new NotFoundError(
-        `No relationship found between users: ${senderId} and ${recipientId}`
-      );
+      throw new NotFoundError(`No friendship found with id: ${friendshipId}`);
     }
 
     return { removed: true };
   }
 
-  /** Get user's friends by status
+  /** Get user's friends by user id
    *
-   * Returns [{friendUsername, firstName, lastName, email, profilePic, status} ...] or empty array if no friends are found for user
+   * Returns {friends: [id, username, first_name, last_name, email, profile_pic]], sentRequests[...], incomingRequests:[...]}
    *
-   * Throws BadRequestError if status is not 'accepted' or 'pending'
    **/
 
-  static async getFriendsByStatus(userId, status) {
-    status = status.toLowerCase();
-    if (!["accepted", "pending", "sent"].includes(status)) {
-      throw new BadRequestError(
-        `Invalid status: ${status}. Must be 'accepted', 'pending', or 'sent'.`
-      );
-    }
-
-    let result;
-
-    if (status === "sent") {
-      // Get friend requests the user has SENT but are still pending
-      result = await db.query(
-        `SELECT u.username AS "friendUsername", 
+  static async getFriendsByUserId(userId) {
+    const friendsRes = await db.query(
+      `SELECT f.id,
+              u.username AS "username",
               u.first_name AS "firstName",
               u.last_name AS "lastName",
-              u.email AS "email",
-              u.profile_pic AS "profilePic",
-              f.status
-         FROM friend f
-         JOIN users u ON u.id = f.recipient_id
-         WHERE f.sender_id = $1
-           AND f.status = 'pending'`,
-        [userId]
-      );
-    } else if (status === "pending") {
-      // Get friend requests the user has RECEIVED but have not accepted
-      result = await db.query(
-        `SELECT u.username AS "friendUsername", 
-              u.first_name AS "firstName",
-              u.last_name AS "lastName",
-              u.email AS "email",
-              u.profile_pic AS "profilePic",
-              f.status
-         FROM friend f
-         JOIN users u ON u.id = f.sender_id
-         WHERE f.recipient_id = $1
-           AND f.status = 'pending'`,
-        [userId]
-      );
-    } else {
-      // Get accepted friends (default case)
-      result = await db.query(
-        `SELECT u.username AS "friendUsername", 
-              u.first_name AS "firstName",
-              u.last_name AS "lastName",
-              u.email AS "email",
-              u.profile_pic AS "profilePic",
-              f.status
-         FROM friend f
-         JOIN users u ON 
-            (f.sender_id = u.id OR f.recipient_id = u.id)
-         WHERE (f.sender_id = $1 OR f.recipient_id = $1)
-           AND u.id != $1
-           AND f.status = 'accepted'`,
-        [userId]
-      );
-    }
+              u.email,
+              u.profile_pic AS "profilePic"
+       FROM friend f
+       JOIN users u ON u.id = CASE 
+                                WHEN f.sender_id = $1 THEN f.recipient_id 
+                                ELSE f.sender_id 
+                              END
+       WHERE (f.sender_id = $1 OR f.recipient_id = $1)
+         AND f.status = 'accepted'`,
+      [userId]
+    );
 
-    return result.rows;
+    const incomingRes = await db.query(
+      `SELECT f.id,
+              u.username AS "username",
+              u.first_name AS "firstName",
+              u.last_name AS "lastName",
+              u.email,
+              u.profile_pic AS "profilePic"
+       FROM friend f
+       JOIN users u ON u.id = f.sender_id
+       WHERE f.recipient_id = $1
+         AND f.status = 'pending'`,
+      [userId]
+    );
+
+    const sentRes = await db.query(
+      `SELECT f.id,
+              u.username AS "username",
+              u.first_name AS "firstName",
+              u.last_name AS "lastName",
+              u.email,
+              u.profile_pic AS "profilePic"
+       FROM friend f
+       JOIN users u ON u.id = f.recipient_id
+       WHERE f.sender_id = $1
+         AND f.status = 'pending'`,
+      [userId]
+    );
+
+    return {
+      friends: friendsRes.rows,
+      incomingRequests: incomingRes.rows,
+      sentRequests: sentRes.rows,
+    };
   }
 
   /** Check if two users are friends
    *
    * Returns true if users are friends (status = 'accepted'), otherwise false.
    */
-
   static async areFriends(userId1, userId2) {
     const result = await db.query(
       `SELECT 1 FROM friend
@@ -195,6 +190,22 @@ class Friend {
     );
 
     return result.rowCount > 0;
+  }
+
+  /**
+   * Get the senderId, recipientId, and status by friend id 
+   * 
+   * Returns {senderId, recipientId, status} or null if no relationship exists
+   */
+  static async getById(friendId) {
+    const result = await db.query(
+      `SELECT id, sender_id AS "senderId", recipient_id AS "recipientId", status
+       FROM friend
+       WHERE id = $1`,
+      [friendId]
+    );
+  
+    return result.rows[0] || null;
   }
 }
 

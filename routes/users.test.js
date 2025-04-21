@@ -4,7 +4,6 @@ const request = require("supertest");
 const db = require("../db.js");
 const app = require("../app.js");
 
-
 const {
   commonBeforeAll,
   commonBeforeEach,
@@ -151,13 +150,23 @@ describe("GET /users/:username", function () {
         bio: null,
         profilePic: null,
         trips: expect.any(Array),
-        friends: expect.any(Array),
-        friendRequests: expect.any(Array),
+        friends: [
+          {
+            id: expect.any(Number),
+            username: "u2",
+            firstName: "U2F",
+            lastName: "U2L",
+            email: "user2@user.com",
+            profilePic: null,
+          },
+        ],
+        incomingRequests: [],
+        sentRequests: [],
       },
     });
   });
 
-  test("works for same user: can get their own profile", async function () {
+  test("works for same user: can get their own information", async function () {
     const resp = await request(app)
       .get(`/users/u1`)
       .set("authorization", `Bearer ${getU1Token()}`);
@@ -175,44 +184,22 @@ describe("GET /users/:username", function () {
         profilePic: null,
         trips: expect.any(Array),
         friends: expect.any(Array),
-        friendRequests: expect.any(Array),
+        incomingRequests: expect.any(Array),
+        sentRequests: expect.any(Array),
       },
     });
   });
 
-  test("works for friends: can get each other's profile", async function () {
-    const resp = await request(app)
-      .get(`/users/u1`)
-      .set("authorization", `Bearer ${getU2Token()}`);
-
-    expect(resp.statusCode).toEqual(200);
-    expect(resp.body).toEqual({
-      user: {
-        id: expect.any(Number),
-        username: "u1",
-        firstName: "U1F",
-        lastName: "U1L",
-        email: "user1@user.com",
-        isAdmin: false,
-        bio: null,
-        profilePic: null,
-        trips: expect.any(Array),
-        friends: expect.any(Array),
-        friendRequests: expect.any(Array),
-      },
-    });
-  });
-
-  test("fails for non-friends: cannot access profile (403 Forbidden)", async function () {
+  test("fails for non-admin and not of same user: cannot access user (401 Unauthorized)", async function () {
     const resp = await request(app)
       .get(`/users/admin`)
       .set("authorization", `Bearer ${getU1Token()}`);
 
-    expect(resp.statusCode).toEqual(403);
+    expect(resp.statusCode).toEqual(401);
     expect(resp.body).toEqual({
       error: {
-        message: "You are not friends with this user.",
-        status: 403,
+        message: "You do not have permission to access this page.",
+        status: 401,
       },
     });
   });
@@ -223,7 +210,7 @@ describe("GET /users/:username", function () {
     expect(resp.statusCode).toEqual(401);
     expect(resp.body).toEqual({
       error: {
-        message: "You must be logged in.",
+        message: "You do not have permission to access this page.",
         status: 401,
       },
     });

@@ -6,8 +6,6 @@ const app = require("../app.js");
 const Friend = require("../models/friend.js");
 const db = require("../db.js");
 
-
-
 const {
   commonBeforeAll,
   commonBeforeEach,
@@ -18,6 +16,7 @@ const {
   getU1Token,
   getU2Token,
   getU3Token,
+  getTripMemberId,
 } = require("./_tripsTestCommon.js");
 
 beforeAll(commonBeforeAll);
@@ -38,7 +37,7 @@ describe("POST /trips/:tripId/members", function () {
         userId: testUserIds["u3"],
         tripId: testTripIds["privateTripId"],
         role: "member",
-        joinedAt: expect.any(String),
+        id: expect.any(Number),
       },
     });
 
@@ -66,8 +65,11 @@ describe("POST /trips/:tripId/members", function () {
 
   test("403 if non owner of a trip tries to add a friend", async function () {
     // Make u1 and u2 friends
-    await Friend.sendFriendRequest(testUserIds["u1"], testUserIds["u2"]);
-    await Friend.acceptFriendRequest(testUserIds["u1"], testUserIds["u2"]);
+    const friendReq = await Friend.sendFriendRequest(
+      testUserIds["u1"],
+      testUserIds["u2"]
+    );
+    await Friend.acceptFriendRequest(friendReq.id, testUserIds["u2"]);
     const resp = await request(app)
       .post(`/trips/${testTripIds["publicTripId"]}/members`)
       .send({ friendId: testUserIds["u1"] })
@@ -81,8 +83,11 @@ describe("POST /trips/:tripId/members", function () {
   });
   test("400 if friendId is not a number", async function () {
     // Make u1 and u2 friends
-    await Friend.sendFriendRequest(testUserIds["u1"], testUserIds["u2"]);
-    await Friend.acceptFriendRequest(testUserIds["u1"], testUserIds["u2"]);
+    const friendReq = await Friend.sendFriendRequest(
+      testUserIds["u1"],
+      testUserIds["u2"]
+    );
+    await Friend.acceptFriendRequest(friendReq.id, testUserIds["u2"]);
     const resp = await request(app)
       .post(`/trips/${testTripIds["publicTripId"]}/members`)
       .send({ friendId: "bad friend id" })
@@ -110,15 +115,13 @@ describe("POST /trips/:tripId/members", function () {
 /************************************** DELETE /trips/:tripId/members/:friendId  */
 describe("DELETE /trips/:tripId/members/:friendId", function () {
   test("works: trip owner can remove a member", async function () {
+    const tripMemberId = getTripMemberId();
     const resp = await request(app)
-      .delete(
-        `/trips/${testTripIds["privateTripId"]}/members/${testUserIds["u1"]}`
-      )
+      .delete(`/trips/${testTripIds["privateTripId"]}/members/${tripMemberId}`)
       .set("authorization", `Bearer ${getU2Token()}`);
 
-    console.log(resp.body);
     expect(resp.statusCode).toEqual(200);
-    expect(resp.body).toEqual({ removed: `${testUserIds["u1"]}` });
+    expect(resp.body).toEqual({ removed: tripMemberId });
 
     // Ensure user is removed from trip_member
     const memberCheck = await db.query(
@@ -131,7 +134,7 @@ describe("DELETE /trips/:tripId/members/:friendId", function () {
   test("403 error: non-owner cannot remove a member", async function () {
     const resp = await request(app)
       .delete(
-        `/trips/${testTripIds["privateTripId"]}/members/${testUserIds["u2"]}`
+        `/trips/${testTripIds["privateTripId"]}/members/${getTripMemberId()}`
       )
       .set("authorization", `Bearer ${getU1Token()}`);
 
@@ -144,21 +147,7 @@ describe("DELETE /trips/:tripId/members/:friendId", function () {
     });
   });
 
-  test("404 error: cannot remove a user who is not a member", async function () {
-    const resp = await request(app)
-      .delete(`/trips/${testTripIds["publicTripId"]}/members/${testUserIds["u2"]}`)
-      .set("authorization", `Bearer ${getU1Token()}`);
-
-    expect(resp.statusCode).toEqual(404);
-    expect(resp.body).toEqual({
-      error: {
-        message: "User is not a member of this trip.",
-        status: 404,
-      },
-    });
-  });
-
-  test("404 error: cannot remove an invalid user", async function () {
+  test("404 error: cannot remove an invalid friend id", async function () {
     const resp = await request(app)
       .delete(`/trips/${testTripIds["publicTripId"]}/members/3453`)
       .set("authorization", `Bearer ${getU1Token()}`);
@@ -166,7 +155,7 @@ describe("DELETE /trips/:tripId/members/:friendId", function () {
     expect(resp.statusCode).toEqual(404);
     expect(resp.body).toEqual({
       error: {
-        message: "User with ID 3453 not found.",
+        message: "No trip member found with trip member id: 3453",
         status: 404,
       },
     });
@@ -174,7 +163,7 @@ describe("DELETE /trips/:tripId/members/:friendId", function () {
 
   test("404 error: cannot remove from a non-existent trip", async function () {
     const resp = await request(app)
-      .delete(`/trips/46456/members/${testUserIds["u2"]}`)
+      .delete(`/trips/46456/members/${getTripMemberId()}`)
       .set("authorization", `Bearer ${getU1Token()}`);
     expect(resp.statusCode).toEqual(404);
     expect(resp.body).toEqual({
@@ -187,7 +176,7 @@ describe("DELETE /trips/:tripId/members/:friendId", function () {
 
   test("401 error: unauthorized user", async function () {
     const resp = await request(app).delete(
-      `/trips/${testTripIds["publicTripId"]}/members/${testUserIds["u1"]}`
+      `/trips/${testTripIds["publicTripId"]}/members/${getTripMemberId()}`
     );
 
     expect(resp.statusCode).toEqual(401);

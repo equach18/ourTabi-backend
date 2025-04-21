@@ -12,12 +12,20 @@ CREATE TABLE users (
     is_admin BOOLEAN DEFAULT FALSE
 );
 
+-- CREATE TABLE friend (
+--     sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+--     recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+--     status TEXT CHECK (status IN ('pending', 'accepted')) DEFAULT 'pending',
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     PRIMARY KEY (sender_id, recipient_id)
+-- );
 CREATE TABLE friend (
+    id SERIAL PRIMARY KEY,
     sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     status TEXT CHECK (status IN ('pending', 'accepted')) DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (sender_id, recipient_id)
+    UNIQUE (sender_id, recipient_id)
 );
 
 CREATE TABLE trip (
@@ -32,12 +40,21 @@ CREATE TABLE trip (
     creator_id INTEGER REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- CREATE TABLE trip_member (
+--     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+--     trip_id INTEGER NOT NULL REFERENCES trip(id) ON DELETE CASCADE,
+--     role TEXT CHECK (role IN ('owner', 'member')) DEFAULT 'member',
+--     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     PRIMARY KEY (user_id, trip_id)
+-- );
+
 CREATE TABLE trip_member (
+    id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     trip_id INTEGER NOT NULL REFERENCES trip(id) ON DELETE CASCADE,
     role TEXT CHECK (role IN ('owner', 'member')) DEFAULT 'member',
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (user_id, trip_id)
+    UNIQUE (user_id, trip_id)
 );
 
 CREATE TABLE activity (
@@ -77,4 +94,3 @@ CREATE TABLE comment (
     text TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-

@@ -3,7 +3,7 @@
 const request = require("supertest");
 const db = require("../db.js");
 const app = require("../app.js");
-const Friend = require("../models/friend");
+const Friend = require("../models/friend.js");
 
 const {
   commonBeforeAll,
@@ -11,6 +11,7 @@ const {
   commonAfterEach,
   commonAfterAll,
   testUserIds,
+  getFriendId,
   getU1Token,
   getU2Token,
   getAdminToken,
@@ -21,16 +22,17 @@ beforeEach(commonBeforeEach);
 afterEach(commonAfterEach);
 afterAll(commonAfterAll);
 
-/************************************** POST /users/:username/friend-request */
+/************************************** POST /friends/:recipientId */
 
-describe("POST /users/:username/friend-request", function () {
+describe("POST /friends/:recipientId", function () {
   test("works: successfully sends a friend request", async function () {
     const resp = await request(app)
-      .post(`/users/admin/friend-request`)
+      .post(`/friends/${testUserIds["admin"]}`)
       .set("authorization", `Bearer ${getU1Token()}`);
     expect(resp.statusCode).toEqual(201);
     expect(resp.body).toEqual({
       friendRequest: {
+        id: expect.any(Number),
         senderId: testUserIds["u1"],
         recipientId: testUserIds["admin"],
         status: "pending",
@@ -46,9 +48,9 @@ describe("POST /users/:username/friend-request", function () {
     expect(check.rows[0].status).toEqual("pending");
   });
 
-  test("404 error: user does not exist ", async function () {
+  test("404 error: recipient id does not exist ", async function () {
     const resp = await request(app)
-      .post(`/users/badUsername/friend-request`)
+      .post(`/friends/32423`)
       .set("authorization", `Bearer ${getU1Token()}`);
 
     expect(resp.statusCode).toEqual(404);
@@ -56,7 +58,7 @@ describe("POST /users/:username/friend-request", function () {
 
   test("fails: cannot send friend request to self (400)", async function () {
     const resp = await request(app)
-      .post(`/users/u1/friend-request`)
+      .post(`/friends/${testUserIds["u1"]}`)
       .set("authorization", `Bearer ${getU1Token()}`);
     expect(resp.statusCode).toEqual(400);
     expect(resp.body.error.message).toEqual(
@@ -67,50 +69,57 @@ describe("POST /users/:username/friend-request", function () {
   test("400 error: cannot send request if already friends", async function () {
     // Try sending the request again
     const resp = await request(app)
-      .post(`/users/u2/friend-request`)
+      .post(`/friends/${testUserIds["u2"]}`)
       .set("authorization", `Bearer ${getU1Token()}`);
 
     expect(resp.statusCode).toEqual(400);
     expect(resp.body.error.message).toEqual(
-      "Friend request already sent or you are already friends."
+      `Friend request already sent or you are already friends.`
     );
   });
 
   test("400 error: cannot send request request already exists", async function () {
-    // Make u1 and u3 friends
-    await Friend.sendFriendRequest(testUserIds["u1"], testUserIds["admin"]);
-    await Friend.acceptFriendRequest(testUserIds["u1"], testUserIds["admin"]);
+    // Make u1 and admin friends
+    const req = await Friend.sendFriendRequest(
+      testUserIds["u1"],
+      testUserIds["admin"]
+    );
+    await Friend.acceptFriendRequest(req.id, testUserIds["admin"]);
 
     // Try sending a request again
     const resp = await request(app)
-      .post(`/users/admin/friend-request`)
+      .post(`/friends/${testUserIds["admin"]}`)
       .set("authorization", `Bearer ${getU1Token()}`);
 
     expect(resp.statusCode).toEqual(400);
     expect(resp.body.error.message).toEqual(
-      "Friend request already sent or you are already friends."
+      `Friend request already sent or you are already friends.`
     );
   });
 
   test("401 error: anonymous users cannot send requests", async function () {
-    const resp = await request(app).post(`/users/u1/friend-request`);
+    const resp = await request(app).post(`/friends/${testUserIds["u1"]}`);
 
     expect(resp.statusCode).toEqual(401);
   });
 });
 
-/************************************** PATCH /users/:username/friend-request */
-describe("PATCH /users/:username/friend-request", function () {
+/************************************** PATCH /friends/:friendId */
+describe("PATCH /friends/:friendId", function () {
   test("works: successfully accepts a friend request", async function () {
-    await Friend.sendFriendRequest(testUserIds["u2"], testUserIds["admin"]);
+    const friendReq = await Friend.sendFriendRequest(
+      testUserIds["u2"],
+      testUserIds["admin"]
+    );
 
     const resp = await request(app)
-      .patch(`/users/u2/friend-request`)
+      .patch(`/friends/${friendReq.id}`)
       .set("authorization", `Bearer ${getAdminToken()}`);
 
     expect(resp.statusCode).toEqual(200);
     expect(resp.body).toEqual({
       acceptedFriend: {
+        id: friendReq.id,
         senderId: testUserIds["u2"],
         recipientId: testUserIds["admin"],
         status: "accepted",
@@ -126,47 +135,64 @@ describe("PATCH /users/:username/friend-request", function () {
 
   test("404 error: request does not exist", async function () {
     const resp = await request(app)
-      .patch(`/users/admin/friend-request`)
+      .patch(`/friends/435345`)
       .set("authorization", `Bearer ${getU1Token()}`);
 
     expect(resp.body).toEqual({
       error: {
-        message: `No pending friend request between users: ${testUserIds["admin"]} and ${testUserIds["u1"]}.`,
+        message: `No friend request found with id: 435345`,
         status: 404,
       },
     });
   });
 
   test("404 error: already friends, no pending request", async function () {
-    await Friend.sendFriendRequest(testUserIds["u2"], testUserIds["admin"]);
-    await Friend.acceptFriendRequest(testUserIds["u2"], testUserIds["admin"]);
+    const friendReq = await Friend.sendFriendRequest(
+      testUserIds["u2"],
+      testUserIds["admin"]
+    );
+    await Friend.acceptFriendRequest(friendReq.id, testUserIds["admin"]);
 
     const resp = await request(app)
-      .patch(`/users/u2/friend-request`)
+      .patch(`/friends/${friendReq.id}`)
       .set("authorization", `Bearer ${getAdminToken()}`);
-    expect(resp.statusCode).toEqual(404);
+
+    expect(resp.body).toEqual({
+      error: {
+        message: `Friend request is not pending.`,
+        status: 400,
+      },
+    });
   });
 
-  test("401 error: anonymous users cannot accept requests", async function () {
-    const resp = await request(app).patch(`/users/u2/friend-request`);
+  test("401 error: anonymous user cannot accept request", async function () {
+    const friendRequest = await Friend.sendFriendRequest(
+      testUserIds["u2"],
+      testUserIds["admin"]
+    );
+
+    const resp = await request(app).patch(`/friends/${friendRequest.id}`);
     expect(resp.statusCode).toEqual(401);
   });
 });
 
-/** ******************************** DELETE users/:username/friend-request */
+/** ******************************** DELETE friends/:friendId */
 
-describe("DELETE users/:username/friend-request", function () {
+describe("DELETE friends/:friendId", function () {
   test("works: recipient can decline a friend request", async function () {
-    await Friend.sendFriendRequest(testUserIds["u1"], testUserIds["admin"]);
+    const friendReq = await Friend.sendFriendRequest(
+      testUserIds["u1"],
+      testUserIds["admin"]
+    );
 
     const resp = await request(app)
-      .delete(`/users/u1/friend-request`) 
+      .delete(`/friends/${friendReq.id}`)
       .set("authorization", `Bearer ${getAdminToken()}`);
 
     expect(resp.statusCode).toEqual(200);
-    expect(resp.body).toEqual({ removed: testUserIds["u1"] });
+    expect(resp.body).toEqual({ removed: friendReq.id });
 
-    // Verify in DB (no record should exist)
+    // Verify in DB
     const res = await db.query(
       `SELECT * FROM friend WHERE sender_id = $1 AND recipient_id = $2`,
       [testUserIds["u1"], testUserIds["admin"]]
@@ -176,27 +202,36 @@ describe("DELETE users/:username/friend-request", function () {
 
   test("works: user can remove an existing friend", async function () {
     const resp = await request(app)
-      .delete(`/users/u1/friend-request`)
+      .delete(`/friends/${getFriendId()}`)
       .set("authorization", `Bearer ${getU2Token()}`);
 
     expect(resp.statusCode).toEqual(200);
-    expect(resp.body).toEqual({ removed: testUserIds["u1"] });
-
+    expect(resp.body).toEqual({ removed: getFriendId() });
   });
 
-  test("404 error: cannot remove non-existent friend request", async function () {
+  test("404 error: cannot remove non-existent friend request(id)", async function () {
     const resp = await request(app)
-      .delete(`/users/u1/friend-request`) // u2 tries to remove a request that never existed
+      .delete(`/friends/${getFriendId()}`)
       .set("authorization", `Bearer ${getAdminToken()}`);
 
-    expect(resp.statusCode).toEqual(404);
+    expect(resp.body).toEqual({
+      error: {
+        message: `You do not have permission to modify this friend request.`,
+        status: 401,
+      },
+    });
   });
 
-  test("fails: cannot remove a request for a non-existent user", async function () {
+  test("fails: cannot remove a request for a non-existent friend id", async function () {
     const resp = await request(app)
-      .delete(`/users/anon/friend-request`)
+      .delete(`/friends/48937`)
       .set("authorization", `Bearer ${getU1Token()}`);
 
-    expect(resp.statusCode).toEqual(404);
+    expect(resp.body).toEqual({
+      error: {
+        message: `No friend request found with id: 48937`,
+        status: 404,
+      },
+    });
   });
 });

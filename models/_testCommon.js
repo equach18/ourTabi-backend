@@ -9,13 +9,13 @@ let testTripIds = [];
 let testActivityIds = [];
 
 async function commonBeforeAll() {
-  await db.query("TRUNCATE users RESTART IDENTITY CASCADE");
-  await db.query("TRUNCATE friend RESTART IDENTITY CASCADE");
-  await db.query("TRUNCATE trip RESTART IDENTITY CASCADE");
-  await db.query("TRUNCATE activity RESTART IDENTITY CASCADE");
-  await db.query("TRUNCATE vote RESTART IDENTITY CASCADE");
-  await db.query("TRUNCATE comment RESTART IDENTITY CASCADE");
-  await db.query("TRUNCATE trip_member RESTART IDENTITY CASCADE");
+  await db.query("DELETE FROM users");
+  await db.query("DELETE FROM trip");
+  await db.query("DELETE FROM trip_member");
+  await db.query("DELETE FROM friend");
+  await db.query("DELETE FROM comment");
+  await db.query("DELETE FROM activity");
+  await db.query("DELETE FROM vote");
 
   // add users
   const userResults = await db.query(

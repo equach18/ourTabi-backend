@@ -9,13 +9,10 @@ const {
   ensureAdmin,
 } = require("../middleware/auth");
 const {
-  ForbiddenError,
   BadRequestError,
-  NotFoundError,
 } = require("../helpers/expressError");
 const { validateSchema } = require("../middleware/validateSchema");
 const User = require("../models/user");
-const Friend = require("../models/friend");
 const {
   userRegisterSchema,
   userUpdateSchema,
@@ -53,23 +50,11 @@ router.post(
 /** GET /[username] => { user: {  id, username, firstName, lastName, email, isAdmin, bio, profilePic, trips: {[id, title, destination, startDate, endDate, isPrivate],...}, friends: {[...],...}, friendRequests: {[...], ...} } }
  * Returns detailed user info: { id, username, firstName, lastName, email, isAdmin, bio, profilePic, trips, friends, friendRequests }
  *
- * Authorization required: admin, is or friends with same-user-as-:username
+ * Authorization required: admin, is or is correct user
  **/
-router.get("/:username", ensureLoggedIn, async function (req, res, next) {
+router.get("/:username", ensureCorrectUserOrAdmin, async function (req, res, next) {
   try {
     const user = await User.get(req.params.username);
-    const currentUser = res.locals.user;
-
-    if (currentUser.isAdmin || currentUser.username === req.params.username) {
-      return res.json({ user });
-    }
-
-    const isFriend = await Friend.areFriends(currentUser.id, user.id);
-
-    if (!isFriend) {
-      throw new ForbiddenError("You are not friends with this user.");
-    }
-
     return res.json({ user });
   } catch (err) {
     return next(err);
@@ -138,86 +123,5 @@ router.get("/", ensureLoggedIn, async function (req, res, next) {
   }
 });
 
-/************************************** Routes to handle friendship between users */
 
-/**
- * POST /:username/friend-request  => { senderId, recipientId, status: "pending" }
- *
- * Sends a friend request to another user.
- *
- * Authorization required: Logged-in user
- */
-router.post(
-  "/:username/friend-request",
-  ensureLoggedIn,
-  async function (req, res, next) {
-    try {
-      const recipient = await User.get(req.params.username);
-
-      if (!recipient)
-        throw new NotFoundError(`User not found: ${req.params.username}`);
-
-      const friendRequest = await Friend.sendFriendRequest(
-        res.locals.user.id,
-        recipient.id
-      );
-      return res.status(201).json({ friendRequest });
-    } catch (err) {
-      return next(err);
-    }
-  }
-);
-
-/**
- * PATCH /:username/friend-request  => { senderId, recipientId, status: "accepted" }
- *
- * Accepts a friend request from another user.
- *
- * Authorization required: Logged-in user
- */
-router.patch(
-  "/:username/friend-request",
-  ensureLoggedIn,
-  async function (req, res, next) {
-    try {
-      const sender = await User.get(req.params.username);
-
-      if (!sender)
-        throw new NotFoundError(`User not found: ${req.params.username}`);
-
-      const acceptedFriend = await Friend.acceptFriendRequest(
-        sender.id,
-        res.locals.user.id
-      );
-      return res.json({ acceptedFriend });
-    } catch (err) {
-      return next(err);
-    }
-  }
-);
-
-/**
- * DELETE /:username/friend-request  => { removed: true }
- *
- * Removes a friend or declines a pending friend request.
- *
- * Authorization required: Logged-in user
- */
-router.delete(
-  "/:username/friend-request",
-  ensureLoggedIn,
-  async function (req, res, next) {
-    try {
-      const friend = await User.get(req.params.username);
-
-      if (!friend)
-        throw new NotFoundError(`User not found: ${req.params.username}`);
-
-      await Friend.remove(res.locals.user.id, friend.id);
-      return res.json({ removed: friend.id });
-    } catch (err) {
-      return next(err);
-    }
-  }
-);
 module.exports = router;

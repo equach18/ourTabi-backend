@@ -334,7 +334,6 @@ describe("PATCH /trips/:tripId", function () {
       .patch(`/trips/934599`)
       .send({ title: "Non-existent Trip" })
       .set("authorization", `Bearer ${getU1Token()}`);
-
     expect(resp.statusCode).toEqual(404);
   });
 

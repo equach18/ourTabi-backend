@@ -26,7 +26,7 @@ describe("addMember", function () {
       userId: testUserIds[1],
       tripId: testTripIds[0],
       role: "member",
-      joinedAt: expect.any(Date),
+      id: expect.any(Number),
     });
   });
 
@@ -40,7 +40,7 @@ describe("addMember", function () {
       userId: testUserIds[2],
       tripId: testTripIds[1],
       role: "owner",
-      joinedAt: expect.any(Date),
+      id: expect.any(Number),
     });
   });
 
@@ -63,24 +63,19 @@ describe("addMember", function () {
 
 describe("removeMember", function () {
   test("works: remove a member from a trip", async function () {
-    await TripMember.addMember(testUserIds[1], testTripIds[0]);
-    const result = await TripMember.removeMember(
-      testUserIds[1],
-      testTripIds[0]
-    );
+    const member = await TripMember.addMember(testUserIds[1], testTripIds[0]);
+
+    const result = await TripMember.removeMember(member.id);
     expect(result).toEqual({ removed: true });
 
-    const check = await db.query(
-      `SELECT * FROM trip_member WHERE user_id = $1 AND trip_id = $2`,
-      [testUserIds[1], testTripIds[0]]
-    );
-    expect(check.rows.length).toEqual(0);
+    const check = await db.query(`SELECT * FROM trip_member WHERE id = $1`, [
+      member.id,
+    ]);
+    expect(check.rows.length).toBe(0);
   });
 
-  test("fails: removing a non-existing member", async function () {
-    await expect(
-      TripMember.removeMember(testUserIds[1], testTripIds[0])
-    ).rejects.toThrow(NotFoundError);
+  test("fails: removing a non-existing trip member id", async function () {
+    await expect(TripMember.removeMember(46545)).rejects.toThrow(NotFoundError);
   });
 });
 
@@ -88,30 +83,28 @@ describe("removeMember", function () {
 
 describe("getTripMembers", function () {
   test("works: get all members of a trip", async function () {
-    await TripMember.addMember(testUserIds[1], testTripIds[0]);
-    await TripMember.addMember(testUserIds[2], testTripIds[0]);
+    const m1 = await TripMember.addMember(testUserIds[1], testTripIds[0]);
+    const m2 = await TripMember.addMember(testUserIds[2], testTripIds[0]);
 
     const members = await TripMember.getTripMembers(testTripIds[0]);
     expect(members).toEqual([
       {
+        id: m1.id,
         userId: testUserIds[1],
         username: expect.any(String),
         firstName: expect.any(String),
         lastName: expect.any(String),
-        email: expect.any(String),
         profilePic: null,
         role: "member",
-        joinedAt: expect.any(Date),
       },
       {
+        id: m2.id,
         userId: testUserIds[2],
         username: expect.any(String),
         firstName: expect.any(String),
         lastName: expect.any(String),
-        email: expect.any(String),
         profilePic: null,
         role: "member",
-        joinedAt: expect.any(Date),
       },
     ]);
   });
@@ -126,9 +119,10 @@ describe("getTripMembers", function () {
 
 describe("isMember", function () {
   test("works: user is a member", async function () {
-    await TripMember.addMember(testUserIds[1], testTripIds[0]);
+    const member = await TripMember.addMember(testUserIds[1], testTripIds[0]);
     const result = await TripMember.isMember(testUserIds[1], testTripIds[0]);
     expect(result).toEqual({
+      id: member.id,
       userId: testUserIds[1],
       tripId: testTripIds[0],
       role: "member",
@@ -140,15 +134,13 @@ describe("isMember", function () {
     expect(result).toBeNull();
   });
 
-  test("fails: invalid tripId", async function () {
-    await expect(TripMember.isMember(testUserIds[1], 0)).rejects.toThrow(
-      NotFoundError
-    );
+  test("null on invalid tripId", async function () {
+    const result = await TripMember.isMember(testUserIds[1], 4564);
+    expect(result).toBeNull();
   });
 
-  test("fails: invalid userId", async function () {
-    await expect(TripMember.isMember(0, testTripIds[0])).rejects.toThrow(
-      NotFoundError
-    );
+  test("null on invalid userId", async function () {
+    const result = await TripMember.isMember(45635, testTripIds[0]);
+    expect(result).toBeNull();
   });
 });

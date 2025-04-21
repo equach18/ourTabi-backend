@@ -10,9 +10,9 @@ let testUserIds = {};
 let u1Token;
 let u2Token;
 let adminToken;
+let friendRequestId; 
 
 async function commonBeforeAll() {
-  // Clear all users
   await db.query("DELETE FROM users");
   await db.query("DELETE FROM friend");
 
@@ -71,8 +71,10 @@ async function commonBeforeAll() {
     isAdmin: true,
   });
 
-  await Friend.sendFriendRequest(testUserIds["u1"], testUserIds["u2"]);
-  await Friend.acceptFriendRequest(testUserIds["u1"], testUserIds["u2"]);
+  const request = await Friend.sendFriendRequest(testUserIds["u1"], testUserIds["u2"]);
+  await Friend.acceptFriendRequest(request.id, testUserIds["u2"]);
+
+  friendRequestId = request.id
 }
 
 async function commonBeforeEach() {
@@ -93,6 +95,7 @@ module.exports = {
   commonAfterEach,
   commonAfterAll,
   testUserIds,
+  getFriendId: () => friendRequestId,
   getU1Token: () => u1Token,
   getU2Token: () => u2Token,
   getAdminToken: () => adminToken,

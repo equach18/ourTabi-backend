@@ -18,6 +18,7 @@ let testCommentIds = {};
 let testActivityIds = {};
 let testVoteIds = {};
 let u1Token, u2Token, u3Token;
+let tripMemberId;
 
 async function commonBeforeAll() {
   await db.query("DELETE FROM users");
@@ -106,12 +107,19 @@ async function commonBeforeAll() {
   testTripIds.publicTripId = publicTrip.id;
   testTripIds.privateTripId = privateTrip.id;
 
-  // Make u1 and u3 friends
-  await Friend.sendFriendRequest(testUserIds["u2"], testUserIds["u3"]);
-  await Friend.acceptFriendRequest(testUserIds["u2"], testUserIds["u3"]);
+  // Make u2 and u3 friends
+  const friendReq = await Friend.sendFriendRequest(
+    testUserIds["u2"],
+    testUserIds["u3"]
+  );
+  await Friend.acceptFriendRequest(friendReq.id, testUserIds["u3"]);
 
   // add u1 to u2's privateTrip
-  await TripMember.addMember(testUserIds["u1"], testTripIds["privateTripId"]);
+  const member = await TripMember.addMember(
+    testUserIds["u1"],
+    testTripIds["privateTripId"]
+  );
+  tripMemberId = member.id
 
   //   add comment to private trip
   const c1 = await Comment.create({
@@ -136,7 +144,11 @@ async function commonBeforeAll() {
   testActivityIds.a1 = a1.id;
 
   //   cast vote on activity
-  const newVote = await Vote.castVote(testUserIds["u1"], testActivityIds["a1"], 1);
+  const newVote = await Vote.castVote(
+    testUserIds["u1"],
+    testActivityIds["a1"],
+    1
+  );
   testVoteIds.v1 = newVote.id;
 }
 
@@ -162,6 +174,7 @@ module.exports = {
   testCommentIds,
   testActivityIds,
   testVoteIds,
+  getTripMemberId: () => tripMemberId,
   getU1Token: () => u1Token,
   getU2Token: () => u2Token,
   getU3Token: () => u3Token,

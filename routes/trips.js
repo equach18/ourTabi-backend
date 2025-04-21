@@ -23,7 +23,6 @@ const {
   BadRequestError,
 } = require("../helpers/expressError");
 const { tripNewSchema, tripUpdateSchema } = require("../schemas/tripSchemas");
-const { commentNewSchema } = require("../schemas/commentSchemas");
 const {
   activityNewSchema,
   activityUpdateSchema,
@@ -71,19 +70,24 @@ router.post(
  *
  * Authorization required: Logged in users - any for non-private trips, member-only for private trips.
  */
-router.get("/:tripId", ensureLoggedIn, async function (req, res, next) {
-  try {
-    const trip = await Trip.get(req.params.tripId);
-    const member = await TripMember.isMember(res.locals.user.id, trip.id);
+router.get(
+  "/:tripId",
+  ensureLoggedIn,
+  ensureTripExists,
+  async function (req, res, next) {
+    try {
+      const trip = await Trip.get(req.params.tripId);
+      const member = await TripMember.isMember(res.locals.user.id, trip.id);
 
-    if (trip.isPrivate && !member) {
-      throw new ForbiddenError("Unauthorized to view this trip.");
+      if (trip.isPrivate && !member) {
+        throw new ForbiddenError("Unauthorized to view this trip.");
+      }
+      return res.json({ trip });
+    } catch (err) {
+      return next(err);
     }
-    return res.json({ trip });
-  } catch (err) {
-    return next(err);
   }
-});
+);
 
 /** GET /trips  => { trips: [{ id, title, destination, radius, startDate, endDate, isPrivate, createdAt, creatorId }, ...] }
  *
@@ -119,6 +123,7 @@ router.get("/", ensureLoggedIn, async function (req, res, next) {
 router.patch(
   "/:tripId",
   ensureLoggedIn,
+  ensureTripExists,
   ensureTripMember,
   validateSchema(tripUpdateSchema),
   async function (req, res, next) {
@@ -195,31 +200,24 @@ router.post(
   }
 );
 
-/** DELETE /trips/:tripId/members/:userId  =>  { removed: userId }
+/** DELETE /trips/:tripId/members/:tripMemberId  =>  { removed: true }
  *
  * Removes a member from a trip.
  *
  * Authorization required: Trip owner.
  */
 router.delete(
-  "/:tripId/members/:friendId",
+  "/:tripId/members/:tripMemberId",
   ensureLoggedIn,
   ensureTripExists,
   ensureTripOwner,
   async function (req, res, next) {
     try {
-      const { tripId, friendId } = req.params;
+      const tripMemberId = Number(req.params.tripMemberId);
 
-      // Ensure the user being removed is actually a member
-      const member = await TripMember.isMember(friendId, tripId);
-      if (!member) {
-        throw new NotFoundError("User is not a member of this trip.");
-      }
+      await TripMember.removeMember(tripMemberId);
 
-      // Remove the member
-      await TripMember.removeMember(friendId, tripId);
-
-      return res.json({ removed: friendId });
+      return res.json({ removed: tripMemberId });
     } catch (err) {
       return next(err);
     }

@@ -35,7 +35,7 @@ describe("register", function () {
     });
 
     expect(newUser).toEqual({
-      id: expect.any(Number), 
+      id: expect.any(Number),
       username: "newUser",
       firstName: "New",
       lastName: "User",
@@ -138,7 +138,8 @@ describe("get", function () {
       profilePic: null,
       trips: expect.any(Array),
       friends: [],
-      friendRequests: [],
+      incomingRequests: [],
+      sentRequests: [],
     });
   });
 
@@ -207,42 +208,42 @@ describe("remove", function () {
   });
 });
 
-/************************************** findAll */
+// /************************************** findAll */
 
-describe("findAll", function () {
-  test("works: retrieves all users", async function () {
-    const users = await User.findAll();
+// describe("findAll", function () {
+//   test("works: retrieves all users", async function () {
+//     const users = await User.findAll();
 
-    expect(users).toEqual(
-      expect.arrayContaining([
-        {
-          id: testUserIds[0],
-          username: "u1",
-          firstName: "U1F",
-          lastName: "U1L",
-          email: "u1@email.com",
-          isAdmin: false,
-        },
-        {
-          id: testUserIds[1],
-          username: "u2",
-          firstName: "U2F",
-          lastName: "U2L",
-          email: "u2@email.com",
-          isAdmin: false,
-        },
-        {
-          id: testUserIds[2],
-          username: "admin",
-          firstName: "Admin",
-          lastName: "User",
-          email: "admin@email.com",
-          isAdmin: true,
-        },
-      ])
-    );
-  });
-});
+//     expect(users).toEqual(
+//       expect.arrayContaining([
+//         {
+//           id: testUserIds[0],
+//           username: "u1",
+//           firstName: "U1F",
+//           lastName: "U1L",
+//           email: "u1@email.com",
+//           isAdmin: false,
+//         },
+//         {
+//           id: testUserIds[1],
+//           username: "u2",
+//           firstName: "U2F",
+//           lastName: "U2L",
+//           email: "u2@email.com",
+//           isAdmin: false,
+//         },
+//         {
+//           id: testUserIds[2],
+//           username: "admin",
+//           firstName: "Admin",
+//           lastName: "User",
+//           email: "admin@email.com",
+//           isAdmin: true,
+//         },
+//       ])
+//     );
+//   });
+// });
 
 /************************************** searchUsers */
 

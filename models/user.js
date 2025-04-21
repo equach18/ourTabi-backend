@@ -92,29 +92,29 @@ class User {
     return result.rows[0];
   }
 
-  /** Find all users.
-   *
-   * Returns [{ id, username, first_name, last_name, email, is_admin }, ...]
-   **/
+  // /** Find all users.
+  //  *
+  //  * Returns [{ id, username, first_name, last_name, email, is_admin }, ...]
+  //  **/
 
-  static async findAll() {
-    const result = await db.query(
-      `SELECT id,
-              username,
-              first_name AS "firstName",
-              last_name AS "lastName",
-              email,
-              is_admin AS "isAdmin"
-        FROM users
-        ORDER BY username`
-    );
+  // static async findAll() {
+  //   const result = await db.query(
+  //     `SELECT id,
+  //             username,
+  //             first_name AS "firstName",
+  //             last_name AS "lastName",
+  //             email,
+  //             is_admin AS "isAdmin"
+  //       FROM users
+  //       ORDER BY username`
+  //   );
 
-    return result.rows;
-  }
+  //   return result.rows;
+  // }
 
   /** Given a username, return data about user including their trips.
    *
-   * Returns {  id, username, firstName, lastName, email, isAdmin, bio, profilePic, trips: [id, title, destination, startDate, endDate, isPrivate], friends: [...], friendRequests: [...] }
+   * Returns {  id, username, firstName, lastName, email, isAdmin, bio, profilePic, trips: [id, title, destination, startDate, endDate, isPrivate], : friends: [friends: [{id, username, firstName, lastName, email, profilePic}, ...], incomingRequests: [...], sentRequest:[...]] }
    * Throws NotFoundError if user not found.
    **/
 
@@ -157,8 +157,11 @@ class User {
     );
 
     user.trips = tripsRes.rows;
-    user.friends = await Friend.getFriendsByStatus(user.id, "accepted");
-    user.friendRequests = await Friend.getFriendsByStatus(user.id, "pending");
+    const { friends, incomingRequests, sentRequests } =
+      await Friend.getFriendsByUserId(user.id);
+    user.friends = friends;
+    user.incomingRequests = incomingRequests;
+    user.sentRequests = sentRequests;
 
     return user;
   }

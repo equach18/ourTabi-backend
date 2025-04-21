@@ -21,10 +21,12 @@ app.use(authenticateJWT);
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
 const tripRoutes = require("./routes/trips");
+const friendRoutes = require("./routes/friends");
 
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/trips", tripRoutes);
+app.use("/friends", friendRoutes);
 
 /** Handle 404 errors -- matches everything */
 app.use(function (req, res, next) {
