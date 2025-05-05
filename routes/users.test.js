@@ -152,7 +152,8 @@ describe("GET /users/:username", function () {
         trips: expect.any(Array),
         friends: [
           {
-            id: expect.any(Number),
+            friendId: expect.any(Number),
+            userId: expect.any(Number),
             username: "u2",
             firstName: "U2F",
             lastName: "U2L",
@@ -412,6 +413,7 @@ describe("GET /users/", function () {
           firstName: "U1F",
           lastName: "U1L",
           profilePic: null,
+          email: "user1@user.com"
         },
         {
           id: expect.any(Number),
@@ -419,6 +421,7 @@ describe("GET /users/", function () {
           firstName: "U2F",
           lastName: "U2L",
           profilePic: null,
+          email: "user2@user.com"
         },
       ]),
     });

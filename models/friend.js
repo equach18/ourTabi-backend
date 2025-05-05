@@ -119,13 +119,14 @@ class Friend {
 
   /** Get user's friends by user id
    *
-   * Returns {friends: [id, username, first_name, last_name, email, profile_pic]], sentRequests[...], incomingRequests:[...]}
+   * Returns {friends: [friendId, userId, username, firstName, lastName, email, profilePic]], sentRequests[...], incomingRequests:[...]}
    *
    **/
 
   static async getFriendsByUserId(userId) {
     const friendsRes = await db.query(
-      `SELECT f.id,
+      `SELECT f.id AS "friendId",
+              u.id AS "userId",
               u.username AS "username",
               u.first_name AS "firstName",
               u.last_name AS "lastName",
@@ -142,7 +143,8 @@ class Friend {
     );
 
     const incomingRes = await db.query(
-      `SELECT f.id,
+      `SELECT f.id AS "friendId",
+              u.id AS "userId",
               u.username AS "username",
               u.first_name AS "firstName",
               u.last_name AS "lastName",
@@ -156,7 +158,8 @@ class Friend {
     );
 
     const sentRes = await db.query(
-      `SELECT f.id,
+      `SELECT f.id AS "friendId",
+              u.id AS "userId",
               u.username AS "username",
               u.first_name AS "firstName",
               u.last_name AS "lastName",

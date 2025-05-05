@@ -259,6 +259,7 @@ describe("searchUsers", function () {
           firstName: "U1F",
           lastName: "U1L",
           profilePic: null,
+          email: "u1@email.com"
         },
         {
           id: testUserIds[1],
@@ -266,6 +267,7 @@ describe("searchUsers", function () {
           firstName: "U2F",
           lastName: "U2L",
           profilePic: null,
+          email: "u2@email.com"
         },
       ])
     );
@@ -281,6 +283,7 @@ describe("searchUsers", function () {
         firstName: "U1F",
         lastName: "U1L",
         profilePic: null,
+        email: "u1@email.com"
       },
     ]);
   });

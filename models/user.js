@@ -232,17 +232,18 @@ class User {
 
   /** Search users by partial username match
    *
-   * Returns [{ id, username, firstName, lastName, profilePic }, ...]
+   * Returns [{ id, username, firstName, lastName, profilePic, email }, ...]
    *
    */
 
   static async searchUsers(query) {
     const result = await db.query(
       `SELECT id, 
-                username, 
-                first_name AS "firstName", 
-                last_name AS "lastName", 
-                profile_pic AS "profilePic"
+              username, 
+              first_name AS "firstName", 
+              last_name AS "lastName", 
+              profile_pic AS "profilePic",
+              email
          FROM users
          WHERE username ILIKE $1
          ORDER BY username`,

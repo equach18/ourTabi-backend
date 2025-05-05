@@ -30,7 +30,7 @@ router.post("/:recipientId", ensureLoggedIn, async function (req, res, next) {
 });
 
 /**
- * PATCH /friends/:friendId  => { senderId, recipientId, status: "accepted" }
+ * PATCH /friends/:friendId  => { id, senderId, recipientId, status: "accepted" }
  *
  * Accepts a friend request using the friendship ID.
  *

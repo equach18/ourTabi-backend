@@ -65,7 +65,7 @@ router.post(
  * If `isPrivate = true`, only members can see it.
  *
  * Returns: { id, title, destination, radius, startDate, endDate, isPrivate, createdAt, creatorId, activities: [{ id, name, category, description, location, scheduledTime, createdBy }, ...],
- *   members: [{ userId, username, firstName, lastName, email, profilePic, role, joinedAt }, ...],
+ *   members: [{ id, userId, username, firstName, lastName, email, profilePic, role }, ...],
  *   comments: [{ id, userId, tripId, text, createdAt }, ...] }
  *
  * Authorization required: Logged in users - any for non-private trips, member-only for private trips.
@@ -166,7 +166,7 @@ router.delete(
  * Adds a member to a trip.
  *
  * Request body: { friendId }
- * Returns: { userId, tripId, role, joinedAt }
+ * Returns: { id, userId, tripId, role, joinedAt }
  *
  * Authorization required: Trip owner - can only add friends
  */
@@ -200,24 +200,24 @@ router.post(
   }
 );
 
-/** DELETE /trips/:tripId/members/:tripMemberId  =>  { removed: true }
+/** DELETE /trips/:tripId/members/:memberId  =>  { removed: true }
  *
  * Removes a member from a trip.
  *
  * Authorization required: Trip owner.
  */
 router.delete(
-  "/:tripId/members/:tripMemberId",
+  "/:tripId/members/:memberId",
   ensureLoggedIn,
   ensureTripExists,
   ensureTripOwner,
   async function (req, res, next) {
     try {
-      const tripMemberId = Number(req.params.tripMemberId);
+      const memberId = Number(req.params.memberId);
 
-      await TripMember.removeMember(tripMemberId);
+      await TripMember.removeMember(memberId);
 
-      return res.json({ removed: tripMemberId });
+      return res.json({ removed: memberId });
     } catch (err) {
       return next(err);
     }
@@ -370,40 +370,6 @@ router.get(
   }
 );
 
-// /** GET /:activityId  => { activity }
-//  *
-//  * Returns activity details, including votes.
-//  *
-//  * Returns: { id, tripId, name, category, description, location, scheduledTime, createdBy, createdAt, votes: [{ userId, voteValue }, ...] }
-//  *
-//  * Authorization required: Public if trip is public, else trip member.
-//  */
-// router.get(
-//   "/:tripId/activities/:activityId",
-//   ensureLoggedIn,
-//   async function (req, res, next) {
-//     try {
-//       const { tripId, activityId } = req.params;
-
-//       // Fetch trip details to check access permissions
-//       const trip = await Trip.get(tripId);
-
-//       // If trip is private, check if user is a member
-//       if (trip.isPrivate) {
-//         const member = await TripMember.isMember(res.locals.user.id, trip.id);
-//         if (!member) {
-//           throw new ForbiddenError("Unauthorized to view this activity.");
-//         }
-//       }
-
-//       // Fetch a single activity
-//       const activity = await Activity.get(activityId);
-//       return res.json({ activity });
-//     } catch (err) {
-//       return next(err);
-//     }
-//   }
-// );
 
 /** PATCH /trips/:tripId/activities/:activityId   => { activity }
  *

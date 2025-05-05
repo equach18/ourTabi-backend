@@ -48,7 +48,6 @@ router.post(
 );
 
 /** GET /[username] => { user: {  id, username, firstName, lastName, email, isAdmin, bio, profilePic, trips: {[id, title, destination, startDate, endDate, isPrivate],...}, friends: {[...],...}, friendRequests: {[...], ...} } }
- * Returns detailed user info: { id, username, firstName, lastName, email, isAdmin, bio, profilePic, trips, friends, friendRequests }
  *
  * Authorization required: admin, is or is correct user
  **/

@@ -166,28 +166,31 @@ describe("getFriendsByUserId", function () {
       await Friend.getFriendsByUserId(testUserIds[0]);
 
     expect(friends).toEqual([
-      expect.objectContaining({
+      {
+        userId: testUserIds[1],
+        friendId: request.id,
         username: "u2",
         firstName: "U2F",
         lastName: "U2L",
         email: "u2@email.com",
         profilePic: null,
-      }),
-    ]);
-    expect(incomingRequests).toEqual([]);
+      },
+    ]),
+      expect(incomingRequests).toEqual([]);
     expect(sentRequests).toEqual([]);
   });
 
   test("works: returns sent requests", async function () {
-    await Friend.sendFriendRequest(testUserIds[0], testUserIds[1]);
-    await Friend.sendFriendRequest(testUserIds[0], testUserIds[2]);
+    const req1 = await Friend.sendFriendRequest(testUserIds[0], testUserIds[1]);
+    const req2 = await Friend.sendFriendRequest(testUserIds[0], testUserIds[2]);
 
     const { friends, incomingRequests, sentRequests } =
       await Friend.getFriendsByUserId(testUserIds[0]);
 
     expect(sentRequests).toEqual([
       {
-        id: expect.any(Number),
+        userId: testUserIds[1],
+        friendId: req1.id,
         username: "u2",
         firstName: "U2F",
         lastName: "U2L",
@@ -195,7 +198,8 @@ describe("getFriendsByUserId", function () {
         profilePic: null,
       },
       {
-        id: expect.any(Number),
+        userId: testUserIds[2],
+        friendId: req2.id,
         username: "admin",
         firstName: "Admin",
         lastName: "User",
@@ -208,14 +212,15 @@ describe("getFriendsByUserId", function () {
   });
 
   test("works: returns incoming requests", async function () {
-    await Friend.sendFriendRequest(testUserIds[2], testUserIds[1]);
+    const req = await Friend.sendFriendRequest(testUserIds[2], testUserIds[1]);
 
     const { friends, incomingRequests, sentRequests } =
       await Friend.getFriendsByUserId(testUserIds[1]);
 
     expect(incomingRequests).toEqual([
       {
-        id: expect.any(Number),
+        userId: testUserIds[2],
+        friendId: req.id,
         username: "admin",
         firstName: "Admin",
         lastName: "User",
@@ -270,10 +275,7 @@ describe("getById()", function () {
   let friendReq;
 
   beforeAll(async function () {
-    friendReq = await Friend.sendFriendRequest(
-      testUserIds[0],
-      testUserIds[1]
-    );
+    friendReq = await Friend.sendFriendRequest(testUserIds[0], testUserIds[1]);
   });
 
   test("works: retrieves friend request by ID", async function () {
@@ -288,7 +290,7 @@ describe("getById()", function () {
   });
 
   test("returns null if no record found", async function () {
-    const result = await Friend.getById(46546); 
+    const result = await Friend.getById(46546);
     expect(result).toBeNull();
   });
 });
