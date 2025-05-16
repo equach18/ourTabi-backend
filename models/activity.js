@@ -60,7 +60,7 @@ class Activity {
             a.category, 
             a.description, 
             a.location, 
-            a.scheduled_time AT TIME ZONE 'UTC' AS "scheduledTime", 
+            a.scheduled_time AS "scheduledTime", 
             a.created_by AS "createdBy", 
             a.created_at AS "createdAt",
             json_agg(
