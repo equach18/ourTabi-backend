@@ -38,10 +38,9 @@ class Activity {
 
     const result = await db.query(
       `INSERT INTO activity
-         (trip_id, name, category, description, location, scheduled_time, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6::TIMESTAMP AT TIME ZONE 'UTC', $7)
-       RETURNING id, trip_id AS "tripId", name, category, description, location, 
-                 scheduled_time AS "scheduledTime", created_by AS "createdBy", created_at AS "createdAt"`,
+        (trip_id, name, category, description, location, scheduled_time, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6::TIMESTAMP AT TIME ZONE 'UTC', $7)
+        RETURNING id, trip_id AS "tripId", name, category, description, location, scheduled_time AS "scheduledTime", created_by AS "createdBy", created_at AS "createdAt"`,
       [tripId, name, category, description, location, scheduledTime, createdBy]
     );
 
@@ -79,7 +78,7 @@ class Activity {
 
     return result.rows.map((activity) => ({
       ...activity,
-      votes: activity.votes[0].userId ? activity.votes : [], 
+      votes: activity.votes[0].userId ? activity.votes : [],
     }));
   }
 
